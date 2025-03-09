@@ -1,0 +1,16 @@
+# .dockerignore file
+
+# Exclude virtual environment directories
+venv
+.venv
+
+# Exclude environment files
+.env
+
+# Exclude Git or any other local config
+.git
+.gitignore
+
+# Exclude Python cache
+__pycache__
+*.pyc

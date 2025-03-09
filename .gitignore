@@ -1,0 +1,40 @@
+# Python cache files and compiled bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment variables and sensitive credentials
+.env
+.env.local
+
+# Virtual environment folders
+venv/
+env/
+.virtualenv/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints
+
+# IDE and editor configurations
+.vscode/
+.idea/
+
+# Operating System specific files
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Output directories or generated files (customize based on your project's structure)
+output/
+*.pdf
+*.json
+
+# Selenium WebDriver binaries (if used locally)
+drivers/
+
+# Streamlit cache
+.streamlit/
