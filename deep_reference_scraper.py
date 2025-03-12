@@ -7,7 +7,7 @@ from tools.extract_data_from_pdf import process_pdf_with_unstructured, extract_r
 
 # Global variables
 processed_papers = {}  # Dictionary to keep track of processed papers (keyed by DOI or title)
-MAX_PAPERS = 5    # Maximum number of papers to collect
+MAX_PAPERS = 100    # Maximum number of papers to collect
 MAX_LEVEL = 3          # Maximum BFS levels (depth)
 
 def download_paper_pdf(paper, output_folder, log_fn=print):
