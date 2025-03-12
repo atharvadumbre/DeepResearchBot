@@ -1,20 +1,13 @@
 import os
 import json
 from openai import OpenAI
-from dotenv import load_dotenv
-import os
 
-OUTPUT_DIR = os.environ.get("OUTPUT_DIR", os.path.join(os.getcwd(), "output"))
-input_file = os.path.join(OUTPUT_DIR, "all_research_content.json")
-output_file = os.path.join(OUTPUT_DIR, "summaries.json")
-
-# Load the environment variables from .env file
-load_dotenv()
+OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
 
 # Initialize the OpenAI client using the new style.
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-def summarize_text(text, model="gpt-4o", temperature=0.3):
+def summarize_text(text, model="gpt-4o", temperature=0.3, log_fn=print):
     """
     Generates a summary of the provided research paper content in no more than 500 words.
     
@@ -43,33 +36,36 @@ def summarize_text(text, model="gpt-4o", temperature=0.3):
         summary = chat_completion.choices[0].message.content.strip()
         return summary
     except Exception as e:
-        print(f"Error generating summary: {e}")
+        log_fn(f"Error generating summary: {e}")
         return ""
 
-def generate_summaries(json_file=input_file, output_file=output_file):
+def generate_summaries(json_file=None, output_file=None, log_fn=print):
     """
     Reads research content from a JSON file and creates summaries for each paper.
     The resulting summaries are saved in a single JSON file.
     """
+    if output_file is None or json_file is None:
+        raise ValueError("json_file and output_file must be provided.")
+    
     with open(json_file, "r", encoding="utf-8") as f:
         papers = json.load(f)
     
     summaries = {}
     for paper_key, content in papers.items():
-        print(f"Generating summary for paper: {paper_key}")
+        log_fn(f"Generating summary for paper: {paper_key}")
         if not content.strip():
-            print(f"Content for {paper_key} is empty. Skipping.")
+            log_fn(f"Content for {paper_key} is empty. Skipping.")
             summaries[paper_key] = ""
             continue
         
         summary = summarize_text(content)
         summaries[paper_key] = summary
-        print(f"Summary for {paper_key} generated.")
+        log_fn(f"Summary for {paper_key} generated.")
     
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(summaries, f, indent=4, ensure_ascii=False)
     
-    print(f"Summaries saved to {output_file}")
+    log_fn(f"Summaries saved to {output_file}")
 
 if __name__ == "__main__":
     generate_summaries()

@@ -2,10 +2,6 @@ import os
 import json
 from tools.extract_data_from_pdf import process_pdf_with_unstructured, extract_references
 
-OUTPUT_DIR = os.environ.get("OUTPUT_DIR", os.path.join(os.getcwd(), "output"))
-input_folder = os.path.join(OUTPUT_DIR, "research_papers")
-output_file = os.path.join(OUTPUT_DIR, "all_research_content.json")
-
 def extract_content_from_pdf(pdf_path):
     """
     Extracts research content (ignoring references) from a PDF file.
@@ -30,7 +26,7 @@ def extract_content_from_pdf(pdf_path):
     research_content, _ = extract_references(combined_text)
     return research_content
 
-def extract_all_contents(input_folder=input_folder):
+def extract_all_contents(input_folder, log_fn=print):
     """
     Iterates over each PDF in the input folder, extracts its research content,
     and stores it in a dictionary where the key is the sanitized filename (without extension)
@@ -45,20 +41,18 @@ def extract_all_contents(input_folder=input_folder):
                 # Sanitize filename by removing extension.
                 key = os.path.splitext(filename)[0]
                 all_contents[key] = content
-                print(f"Extracted content from {filename}")
+                log_fn(f"Extracted content from {filename}")
             except Exception as e:
-                print(f"Error extracting from {filename}: {e}")
+                log_fn(f"Error extracting from {filename}: {e}")
     return all_contents
 
-def main():
+def main(input_folder, output_file,log_fn=print):
     # Extract all research content from the PDFs.
-    data = extract_all_contents()
+    data = extract_all_contents(input_folder, log_fn=log_fn)
     
-    # Save the collected content to a single JSON file.
-    output_file = output_file
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
-    print(f"Saved all research content to {output_file}")
+    log_fn(f"Saved all research content to {output_file}")
 
 if __name__ == "__main__":
     main()

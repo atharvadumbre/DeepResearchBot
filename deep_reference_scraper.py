@@ -7,42 +7,43 @@ from tools.extract_data_from_pdf import process_pdf_with_unstructured, extract_r
 
 # Global variables
 processed_papers = {}  # Dictionary to keep track of processed papers (keyed by DOI or title)
-MAX_PAPERS = 100     # Maximum number of papers to collect
+MAX_PAPERS = 5    # Maximum number of papers to collect
 MAX_LEVEL = 3          # Maximum BFS levels (depth)
 
-def download_paper_pdf(paper):
-    """
-    Downloads the PDF for a given paper using available methods.
-    Returns the local filename if successful.
-    """
+def download_paper_pdf(paper, output_folder, log_fn=print):
     title = paper.get("title", "paper").replace(" ", "_")
+    # Ensure the output folder exists.
+    os.makedirs(output_folder, exist_ok=True)
+    local_pdf = os.path.join(output_folder, f"{title}.pdf")
+    if os.path.exists(local_pdf):
+        log_fn(f"PDF for '{title}' already exists in {output_folder}.")
+        return local_pdf
+
     pdf_url = paper.get("pdf_url")
     html_url = paper.get("html_url")
     doi = paper.get("doi")
-    local_pdf = f"{title}.pdf"
     
-    if os.path.exists(local_pdf):
-        print(f"PDF for '{title}' already exists.")
-        return local_pdf
-
     if pdf_url:
-        print(f"Downloading direct PDF for '{title}'...")
-        download_pdf(pdf_url, local_pdf)
+        log_fn(f"Downloading direct PDF for '{title}'...")
+        download_pdf(pdf_url, local_pdf, log_fn=log_fn)
     elif html_url:
-        print(f"Scraping PDF from HTML for '{title}'...")
-        pdf_url = get_pdf_from_html(html_url)
+        log_fn(f"Scraping PDF from HTML for '{title}'...")
+        pdf_url = get_pdf_from_html(html_url, log_fn=log_fn)
         if pdf_url:
-            download_pdf(pdf_url, local_pdf)
+            download_pdf(pdf_url, local_pdf, log_fn=log_fn)
     elif doi:
-        print(f"Using Sci-Hub for DOI '{doi}'...")
-        pdf_url = get_scihub_pdf(doi)
+        log_fn(f"Using Sci-Hub for DOI '{doi}' for '{title}'...")
+        pdf_url = get_scihub_pdf(doi, log_fn=log_fn)
         if pdf_url:
-            download_pdf(pdf_url, local_pdf)
+            download_pdf(pdf_url, local_pdf, log_fn=log_fn)
     else:
-        print(f"No PDF source available for '{title}'.")
+        log_fn(f"No PDF source available for '{title}'.")
         return None
 
-    return local_pdf if os.path.exists(local_pdf) else None
+    if os.path.exists(local_pdf):
+        return local_pdf
+    return None
+
 
 def extract_references_from_pdf(pdf_path):
     """
@@ -69,40 +70,30 @@ def extract_references_from_pdf(pdf_path):
     
     # Filter out entries that are just numbers or very short (likely artifacts)
     filtered_references = [ref for ref in references_list if not ref.isdigit() and len(ref) > 5]
-    
-    # Debug: Print each filtered reference.
-    print("Filtered References:")
-    for idx, ref in enumerate(filtered_references, start=1):
-        print(f"Reference {idx}: {ref}")
         
     return filtered_references
 
 
-def bfs_scrape(seed_papers, api_key):
-    """
-    Uses breadth-first search to extract references from the given seed papers.
-    Processes all papers at a given level before moving to the next.
-    """
+def bfs_scrape(seed_papers, api_key, output_folder, log_fn=print):
     level = 1
     queue = seed_papers[:]  # Start with seed papers
     while queue and level <= MAX_LEVEL and len(processed_papers) < MAX_PAPERS:
         next_queue = []
-        print(f"\nProcessing level {level} with {len(queue)} papers.")
+        log_fn(f"\nProcessing level {level} with {len(queue)} papers.")
         for paper in queue:
             title = paper.get("title")
-            print(f"\nProcessing paper: {title}")
-            pdf_path = download_paper_pdf(paper)
+            log_fn(f"\nProcessing paper: {title}")
+            pdf_path = download_paper_pdf(paper, output_folder, log_fn=log_fn)
             if not pdf_path:
-                print(f"Skipping '{title}' due to missing PDF.")
+                log_fn(f"Skipping '{title}' due to missing PDF.")
                 continue
 
             references = extract_references_from_pdf(pdf_path)
-            print(f"Found {len(references)} references in '{title}'")
+            log_fn(f"Found {len(references)} references in '{title}'")
             for ref in references:
                 if len(processed_papers) >= MAX_PAPERS:
                     break
-                # Use the reference text as a query to fetch the top result.
-                results = search_google_scholar(ref, api_key)
+                results = search_google_scholar(ref, api_key, log_fn=log_fn)
                 new_papers = extract_research_info(results)
                 if new_papers:
                     new_paper = new_papers[0]  # Take the top result
@@ -111,50 +102,51 @@ def bfs_scrape(seed_papers, api_key):
                         continue
                     processed_papers[key] = new_paper
                     next_queue.append(new_paper)
-                    print(f"Added new paper: {new_paper.get('title')}")
+                    log_fn(f"Added new paper: {new_paper.get('title')}")
                 else:
-                    print(f"No paper found for reference: {ref}")
-        # Move to next level
+                    log_fn(f"No paper found for reference: {ref}")
         queue = next_queue
         level += 1
 
-def main(research_topic=None):
-    from dotenv import load_dotenv
+
+def main(research_topic=None, output_dir=None, log_fn=print):
     import os
     import json
-    load_dotenv()
-    SERPER_API_KEY = os.getenv("SERPER_API_KEY")
+    SERPER_API_KEY = os.environ["SERPER_API_KEY"]
     if not SERPER_API_KEY:
         print("SERPER_API_KEY is not set in the environment.")
         return
 
-    # If no research topic was provided, fallback to prompting the user.
     if research_topic is None:
         research_topic = input("Enter your research topic: ")
 
-    results = search_google_scholar(research_topic, SERPER_API_KEY)
+    results = search_google_scholar(research_topic, SERPER_API_KEY, log_fn=log_fn)
     seed_papers = extract_research_info(results)
     
     if not seed_papers:
-        print("No seed papers found for the query.")
+        log_fn("No seed papers found for the query.")
         return
 
-    print(f"Found {len(seed_papers)} seed papers. Starting BFS reference scraping...")
+    log_fn(f"Found {len(seed_papers)} seed papers. Starting BFS reference scraping...")
 
-    # Register seed papers as processed
+    # Define the PDF output folder inside the temporary directory.
+    pdf_output_folder = os.path.join(output_dir, "research_papers")
+    os.makedirs(pdf_output_folder, exist_ok=True)
+    
+    # Register seed papers as processed.
     for paper in seed_papers:
         key = paper.get("doi") or paper.get("title")
         processed_papers[key] = paper
 
-    bfs_scrape(seed_papers, SERPER_API_KEY)
-
-    print(f"\nBFS reference scraping complete. Total papers collected: {len(processed_papers)}")
-    OUTPUT_DIR = os.environ.get("OUTPUT_DIR", os.path.join(os.getcwd(), "output"))
-    output_path = os.path.join(OUTPUT_DIR, "deep_reference_results.json")
+    # Call bfs_scrape with the output folder.
+    bfs_scrape(seed_papers, SERPER_API_KEY, pdf_output_folder, log_fn=log_fn)
+    
+    log_fn(f"\nBFS reference scraping complete. Total papers collected: {len(processed_papers)}")
+    
+    output_path = os.path.join(output_dir, "deep_reference_results.json")
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(list(processed_papers.values()), f, indent=4)
-
-    print("Results saved to deep_reference_results.json")
+    log_fn("Results saved to deep_reference_results.json")
 
 
 if __name__ == "__main__":

@@ -4,9 +4,6 @@ import re
 from collections import defaultdict
 from unstructured.partition.pdf import partition_pdf  # Actual import
 
-os.environ["PATH"] += os.pathsep + r"C:\Users\athar\AppData\Local\Programs\Python\Python310\Lib\poppler-24.08.0\Library\bin" 
-os.environ["PATH"] += os.pathsep + r"C:\Program Files\Tesseract-OCR"
-
 def clean_text(text):
     """Clean text by stripping extra whitespace."""
     return text.strip()
@@ -17,7 +14,7 @@ def process_pdf_with_unstructured(pdf_path):
         filename=pdf_path,
         include_page_breaks=True,
         strategy="auto",
-        infer_table_structure=True,
+        infer_table_structure=False,
         extract_images_in_pdf=False,
     )
     content_by_page = defaultdict(lambda: {"text": [], "images": [], "tables": []})
@@ -29,10 +26,6 @@ def process_pdf_with_unstructured(pdf_path):
 
         if element_type == "Text":
             content_by_page[page_number]["text"].append(clean_text(element.text or ""))
-        elif element_type == "Image":
-            content_by_page[page_number]["images"].append(element.to_dict())
-        elif element_type == "Table":
-            content_by_page[page_number]["tables"].append(element.to_dict())
         else:
             content_by_page[page_number]["text"].append(clean_text(str(element)))
 
@@ -85,43 +78,3 @@ def extract_references(full_text):
         research_content = full_text.strip()
         references = ""
     return research_content, references
-
-
-
-def main(pdf_path, output_dir):
-    # Extract content by page from the PDF.
-    content_by_page = process_pdf_with_unstructured(pdf_path)
-
-    # Combine text from all pages. Sort pages numerically when possible.
-    combined_text = ""
-    def sort_key(key):
-        try:
-            return int(key)
-        except ValueError:
-            return float('inf')
-    for page in sorted(content_by_page.keys(), key=sort_key):
-        combined_text += content_by_page[page]["text"] + "\n"
-
-    # Extract research content and references using the updated function.
-    research_content, references = extract_references(combined_text)
-
-    # Ensure the output directory exists.
-    os.makedirs(output_dir, exist_ok=True)
-    research_file = os.path.join(output_dir, "research_content.txt")
-    references_file = os.path.join(output_dir, "references.txt")
-
-    with open(research_file, "w", encoding="utf-8") as f:
-        f.write(research_content)
-    with open(references_file, "w", encoding="utf-8") as f:
-        f.write(references)
-
-    print(f"Saved research content to: {research_file}")
-    print(f"Saved references to: {references_file}")
-
-if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python extract_pdf_data.py <pdf_path> <output_directory>")
-        sys.exit(1)
-    pdf_path = sys.argv[1]
-    output_dir = sys.argv[2]
-    main(pdf_path, output_dir)

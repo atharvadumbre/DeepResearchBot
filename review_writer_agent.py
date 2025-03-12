@@ -2,14 +2,12 @@ import os
 import json
 import re
 from openai import OpenAI
-from dotenv import load_dotenv
 from fpdf import FPDF
 
-# Load environment variables from .env (ensure OPENAI_API_KEY is set)
-load_dotenv()
+OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
 
 # Initialize the OpenAI client using the new style.
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 def train_manager_agent():
     """
@@ -28,7 +26,7 @@ def train_manager_agent():
     )
     return guidelines
 
-def generate_review_paper(summaries, model="gpt-4o", temperature=0.3, max_tokens=2000):
+def generate_review_paper(summaries, model="gpt-4o", temperature=0.3, max_tokens=5000):
     """
     Generates a comprehensive review paper based on provided paper summaries.
     The prompt includes training guidelines to instruct the agent on how to write a good review.
@@ -72,7 +70,7 @@ def generate_review_paper(summaries, model="gpt-4o", temperature=0.3, max_tokens
         print(f"Error generating review paper: {e}")
         return ""
 
-def save_text_to_pdf(text, output_file):
+def save_text_to_pdf(text, output_file, log_fn=print):
     """
     Saves the provided text as a PDF file.
     This function removes Markdown bold markers (i.e. **text**) instead of converting them to HTML.
@@ -91,25 +89,24 @@ def save_text_to_pdf(text, output_file):
     pdf.multi_cell(0, 10, clean_text)
     
     pdf.output(output_file)
-    print(f"PDF saved to {output_file}")
+    log_fn(f"PDF saved to {output_file}")
 
-def main():
-    OUTPUT_DIR = os.environ.get("OUTPUT_DIR", os.path.join(os.getcwd(), "output"))
-    summaries_file = os.path.join(OUTPUT_DIR, "summaries.json")
-    output_pdf = os.path.join(OUTPUT_DIR, "review_paper.pdf")
+def main(output_dir, log_fn=print):
+    summaries_file = os.path.join(output_dir, "summaries.json")
+    output_pdf = os.path.join(output_dir, "review_paper.pdf")
 
     # Load summaries.
     try:
         with open(summaries_file, "r", encoding="utf-8") as f:
             summaries = json.load(f)
     except Exception as e:
-        print(f"Error reading {summaries_file}: {e}")
+        log_fn(f"Error reading {summaries_file}: {e}")
         return
     
     # Generate the review paper.
     review_paper = generate_review_paper(summaries)
     if not review_paper:
-        print("No review paper generated.")
+        log_fn("No review paper generated.")
         return
     
     # Save the review as a PDF file.
